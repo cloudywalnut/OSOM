@@ -31,4 +31,5 @@ def chat():
     return jsonify({"response": response.choices[0].message.content})
 
 if __name__ == "__main__":  
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port = int(os.getenv("PORT", 5000))  # Uses Railway's port, defaults to 5000 if running locally
+    app.run(host="0.0.0.0", port=port, debug=True)
