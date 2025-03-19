@@ -27,9 +27,10 @@ def chat():
         model="gpt-4o-mini",
         messages=[
             {"role": "user", "content": message},
-            {"role": "system", "content": "Help kids and teach them Solar System in a Fun Engaging way"}
+            {"role": "system", "content": "Please act like a friend to a child and use very simple easy tone to teach him the basics of the solar system once he/she starts the conversation"}
         ],
-        max_tokens=100
+        max_tokens=100,
+        temperature= 2
     )
 
     return jsonify({"response": response.choices[0].message.content})
