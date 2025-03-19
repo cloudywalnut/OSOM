@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
 from openai import OpenAI
 from dotenv import load_dotenv
 load_dotenv()
@@ -25,7 +25,11 @@ def chat():
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[{"role": "user", "content": message}]
+        messages=[
+            {"role": "user", "content": message},
+            {"role": "system", "content": "Help kids and teach them Solar System in a Fun Engaging way"}
+        ],
+        max_tokens=100
     )
 
     return jsonify({"response": response.choices[0].message.content})
