@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request, render_template
 from openai import OpenAI
 from dotenv import load_dotenv
+import markdown
 load_dotenv()
 import os
 
@@ -38,7 +39,7 @@ def chatOpenai():
         temperature= 0.7
     )
 
-    return jsonify({"response": response.choices[0].message.content})
+    return jsonify({"response": markdown.markdown(response.choices[0].message.content)})
 
 
 @app.route('/chat/google', methods=['POST'])
@@ -59,7 +60,7 @@ def chatGoogle():
         temperature= 0.7
     )
 
-    return jsonify({"response": response.choices[0].message.content})
+    return jsonify({"response": markdown.markdown(response.choices[0].message.content)})
 
 
 if __name__ == "__main__":  
