@@ -34,8 +34,8 @@ def chatOpenai():
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "user", "content": message},
-            {"role": "system", "content": "Please act like a friend to a child and use very simple easy tone to teach him the basics of the solar system once he/she starts the conversation"}
+            {"role": "system", "content": "Please act like a friend to a child and use very simple easy tone to teach him the basics of the solar system once he/she starts the conversation"},
+            {"role": "user", "content": message}
         ],
         max_tokens=100,
         temperature= 0.7
@@ -55,8 +55,8 @@ def chatGoogle():
         model="gemini-2.0-flash-lite",
         n=1,
         messages=[
-            {"role": "user", "content": message},
-            {"role": "system", "content": "Please act like a friend to a child and use very simple easy tone to teach him the basics of the solar system once he/she starts the conversation"}
+            {"role": "system", "content": "Please act like a friend to a child and use very simple easy tone to teach him the basics of the solar system once he/she starts the conversation"},
+            {"role": "user", "content": message}
         ],
         max_tokens=100,
         temperature= 0.7
