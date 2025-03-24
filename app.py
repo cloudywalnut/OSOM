@@ -1,11 +1,13 @@
 from flask import Flask, jsonify, request, render_template
 from openai import OpenAI
 from dotenv import load_dotenv
+from flask_cors import CORS
 import markdown
 load_dotenv()
 import os
 
 app = Flask(__name__)
+CORS(app)
 
 client = OpenAI(
   api_key=os.getenv('apiKey')
