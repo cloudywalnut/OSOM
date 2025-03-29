@@ -99,6 +99,32 @@ def message_emotion(message):
     socketio.emit("emotion", markdown.markdown(response_emotion.choices[0].message.content))
 
 
+@app.route('/chat/Grapes', methods=['POST'])
+def chatGoogle():
+    data = request.json
+    message = data.get("message", "")
+    if not message:
+        return jsonify({"error": "No message provided"}), 400
+
+    response = clientGoogle.chat.completions.create(
+        model="gemini-2.0-flash-lite",
+        n=1,
+        messages=[
+            {"role": "system", "content": ("Exclusively assists users with smart home solutions in "
+            "Malaysia, representing Grapes Smart Tech, a Loxone Gold Partner. It provides expert "
+            "guidance on Loxone Smart Home automation, covering energy efficiency, security, lighting,"
+            "climate control, and seamless home integration. Strictly never deviate from topic and"
+            "make response short and concise")
+            },
+            {"role": "user", "content": message}
+        ],
+        temperature= 0.7
+    )
+
+    return jsonify({"response": markdown.markdown(response.choices[0].message.content)})
+
+
+
 
 if __name__ == "__main__":  
     port = int(os.getenv("PORT", 5000))  # Uses Railway's port, defaults to 5000 if running locally
