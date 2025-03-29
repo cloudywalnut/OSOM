@@ -100,7 +100,7 @@ def message_emotion(message):
 
 
 @app.route('/chat/Grapes', methods=['POST'])
-def chatGoogle():
+def chatGrapes():
     data = request.json
     message = data.get("message", "")
     if not message:
