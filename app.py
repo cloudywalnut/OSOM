@@ -127,6 +127,7 @@ def chatGrapes():
 def chatApp():
     data = request.json
     message = data.get("message", "")
+    system_message = data.get("system_message","You are a helpful assistance who is funny and sarcastic")
     if not message:
         return jsonify({"error": "No message provided"}), 400
 
@@ -134,11 +135,7 @@ def chatApp():
         model="gpt-4o-mini",
         n=1,
         messages=[
-            {"role": "system", "content": ("Talk to me like we're buddies, keep it chill, "
-            "and throw in some random roast or slang with a lot of humor but properly understanding the context. Use Roman Urdu,"
-            "throw in some funny abuses, for e.g 'ghandu, kamine, bakchod, madarchod, behenchod', keep the answer very short and on point"
-            )
-            },
+            {"role": "system", "content": system_message},
             {"role": "user", "content": message}
         ],
         temperature= 0.7
