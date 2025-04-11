@@ -36,14 +36,14 @@ def chatOpenai():
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "Please act like a friend to a child and use very simple easy tone to teach him the basics of the solar system once he/she starts the conversation"},
+            {"role": "system", "content": "Please act like a friend to a child and use very simple easy tone to teach him the basics of the solar system once he/she starts the conversation. Strictly always stick to topic and do not use emojis"},
             {"role": "user", "content": message}
         ],
         max_tokens=100,
         temperature= 0.7
     )
 
-    return jsonify({"response": markdown.markdown(response.choices[0].message.content)})
+    return jsonify({"response": response.choices[0].message.content.strip()})
 
 
 @app.route('/chat/google', methods=['POST'])
