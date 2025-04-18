@@ -127,7 +127,7 @@ def chatGrapes():
 def chatApp():
     data = request.json
     message = data.get("message", "")
-    system_message = data.get("system_message","You are a helpful assistance who is funny and sarcastic")
+    system_message = data.get("system_message","")
     if not message:
         return jsonify({"error": "No message provided"}), 400
 
@@ -135,6 +135,7 @@ def chatApp():
         model="gpt-4o-mini",
         n=1,
         messages=[
+            {"role": "system", "content": "You need to reply on my behalf to the chat message recieved, as if I am replying to that person in the specified tone or instruction provided"},
             {"role": "system", "content": system_message},
             {"role": "user", "content": message}
         ],
@@ -146,4 +147,4 @@ def chatApp():
 
 if __name__ == "__main__":  
     port = int(os.getenv("PORT", 5000))  # Uses Railway's port, defaults to 5000 if running locally
-    socketio.run(app, host="0.0.0.0", port=port, debug=True)
+    socketio.run(app, host="0.0.0.0", port=port, debug=True) 
