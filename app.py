@@ -1,9 +1,13 @@
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, Response, render_template
 from openai import OpenAI
 from dotenv import load_dotenv
 from flask_cors import CORS
 from flask_socketio import SocketIO
 import markdown
+
+import edge_tts
+import asyncio
+
 load_dotenv()
 import os
 
@@ -142,6 +146,40 @@ def chatApp():
     )
 
     return jsonify({"response": response.choices[0].message.content})
+
+
+async def generate_speech(text):
+    tts = edge_tts.Communicate(text,  voice="en-US-AvaMultilingualNeural", rate="-20%", pitch="+40Hz")
+    output = b""
+    async for chunk in tts.stream():
+        if chunk["type"] == "audio":
+            output += chunk["data"]  # Collect all audio data
+    return output
+
+def ai_response(message):
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": (
+                "You must always respond with a concise and playful reply—like a teacher explaining"
+                "to a kid. Keep it short and engaging. The conversation should always be directed to"
+                "the Solar System and never use emojis")
+            },
+            {"role": "user", "content": message}
+        ],
+        temperature= 1
+    )
+
+    print(response.choices[0].message.content)
+    return response.choices[0].message.content
+
+
+@app.route("/tts", methods = ["POST"])
+def get_audio():
+    data = request.json
+    message = data.get("message", "")
+    audio = asyncio.run(generate_speech(ai_response(message)))  # Run async function synchronously
+    return Response(audio, content_type="audio/mpeg")
 
 
 if __name__ == "__main__":  
