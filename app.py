@@ -3,6 +3,9 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from flask_cors import CORS
 from flask_socketio import SocketIO
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import HumanMessage
 import markdown
 
 import edge_tts
@@ -29,7 +32,7 @@ clientGoogle = OpenAI(
 def home():
     return 'Server is Running'
 
-
+# OpenAI Endpoint
 @app.route('/chat/openai', methods=['POST'])
 def chatOpenai():
     data = request.json
@@ -48,7 +51,7 @@ def chatOpenai():
 
     return jsonify({"response": response.choices[0].message.content.strip()})
 
-
+# Google Endpoint
 @app.route('/chat/google', methods=['POST'])
 def chatGoogle():
     data = request.json
@@ -69,9 +72,7 @@ def chatGoogle():
 
     return jsonify({"response": markdown.markdown(response.choices[0].message.content)})
 
-
-
-# Provider of Emotions
+# Websocket also passes the emotions
 @socketio.on('message')
 def message_emotion(message):
 
@@ -101,7 +102,7 @@ def message_emotion(message):
 
     socketio.emit("emotion", markdown.markdown(response_emotion.choices[0].message.content))
 
-
+# Test endpoint
 @app.route('/chat/Grapes', methods=['POST'])
 def chatGrapes():
     data = request.json
@@ -126,6 +127,7 @@ def chatGrapes():
 
     return jsonify({"response": markdown.markdown(response.choices[0].message.content)})
 
+# Test endpoint
 @app.route('/chatApp', methods=['POST'])
 def chatApp():
     data = request.json
@@ -147,7 +149,7 @@ def chatApp():
 
     return jsonify({"response": response.choices[0].message.content})
 
-
+# Text to Speach Usage
 async def generate_speech(text):
     tts = edge_tts.Communicate(text,  voice="en-US-AvaMultilingualNeural", rate="-20%", pitch="+40Hz")
     output = b""
@@ -181,7 +183,47 @@ def get_audio():
     audio = asyncio.run(generate_speech(ai_response(message)))  # Run async function synchronously
     return Response(audio, content_type="audio/mpeg")
 
+# Langchain Endpoints
+model = ChatOpenAI(model = "gpt-4o-mini")
+prompt_template_normal = ChatPromptTemplate(
+    [
+        ("system", "Please act like a friend to a child and use very simple easy tone to teach him the basics of the solar system once he/she starts the conversation"),
+        ("human", "{message}")
+    ]
+)
+prompt_template_genz = ChatPromptTemplate(
+    [
+        ("system", "Please act like a friend to a child and use very simple easy tone to teach him the basics of the solar system once he/she starts the conversation"),
+        ("system", "occasionally include some Genz and Gen alpha slangs on between"),
+        ("human", "{message}")
+    ]
+)
+
+@app.route('/chat', methods = ['POST'])
+def chat():
+    data = request.json
+    message = data.get("message", "")
+    mode_genz = data.get("mode_genz", "")
+    if not message:
+        return jsonify({"error": "No message provided"}), 400
+    if mode_genz:
+        chain = prompt_template_genz | model 
+    else:
+        chain = prompt_template_normal | model         
+    response = chain.invoke({"message": message})
+    return jsonify({"response": response.content})
+
+
+@app.route('/chat/agentic', methods = ['POST'])
+def chat_agentic():
+    data = request.json
+    tools = data.get("tools","")
+    message = [HumanMessage(data.get("message", ""))]
+    # The message passed in invoke should either be a string or a list, so can't directly use HumanMessage
+    # without having it in a list
+    response = model.invoke(message, tools = tools)
+    return jsonify(response.tool_calls[0])
 
 if __name__ == "__main__":  
     port = int(os.getenv("PORT", 5000))  # Uses Railway's port, defaults to 5000 if running locally
-    socketio.run(app, host="0.0.0.0", port=port, debug=True) 
+    socketio.run(app, host="0.0.0.0", port=port, debug=True)
