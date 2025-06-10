@@ -235,7 +235,7 @@ def chat():
 def chat_agentic():
     data = request.json
     tools = data.get("tools","")
-    message = [HumanMessage(data.get("message", ""))]
+    message = [HumanMessage(data.get("content", ""))]
     # The message passed in invoke should either be a string or a list, so can't directly use HumanMessage
     # without having it in a list
     response = model.invoke(message, tools = tools)
