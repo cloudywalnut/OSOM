@@ -240,9 +240,9 @@ def chat_agentic():
     # without having it in a list
     response = model.invoke(message, tools = tools)
     if response.tool_calls:
-        return response.tool_calls
+        return jsonify({"response": response.tool_calls})
     else:
-        return response.content
+        return jsonify({"response": response.content})
 
 @app.route('/eq-question', methods=['POST'])
 def eq_question():
