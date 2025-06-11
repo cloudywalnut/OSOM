@@ -235,12 +235,14 @@ def chat():
 def chat_agentic():
     data = request.json
     tools = data.get("tools","")
-    message = [HumanMessage(data.get("content", ""))]
+    message = [HumanMessage(data.get("message", ""))]
     # The message passed in invoke should either be a string or a list, so can't directly use HumanMessage
     # without having it in a list
     response = model.invoke(message, tools = tools)
-    return jsonify(response.tool_calls[0])
-
+    if response.tool_calls:
+        return response.tool_calls
+    else:
+        return response.content
 
 @app.route('/eq-question', methods=['POST'])
 def eq_question():
