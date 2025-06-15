@@ -195,21 +195,18 @@ genz_slangs = ["lit", "bet", "fam", "no cap", "yeet", "vibe check", "sus", "flex
 
 prompt_template_normal = ChatPromptTemplate(
     [
-        ("system", 
-         "You are a friendly teacher answering a student's question about the {topic} in a very simple, easy tone. "
-         "Keep the explanation fun, clear, and age-appropriate. Always respond warmly, encourage curiosity and strictly never go off topic"
-         ""),
+         ("system", "You are a friendly teacher who is responsible to give short, fun, and simple answers to questions about {topic}."
+         "Answer in simple plain english without using emojis or special characters, never deviate from the {topic} topic and do not"
+         "use greetings."),
         ("human", "{message}")
     ]
 )
 
 prompt_template_genz = ChatPromptTemplate(
     [
-        ("system", 
-         "You are a friendly teacher answering a student's question about the {topic} in a very simple, easy tone. "
-         "Sprinkle in some Gen Z and Gen Alpha slang from this list when appropriate: {genz_slangs}."  
-         "Make the chat fun and relatable, but keep explanations clear and simple and strictly never go off topic."
-         "Never use emojis or greetings (unless user greets)"),
+         ("system", "You are a friendly teacher who is responsible to give short, fun, and simple answers to questions about {topic}."
+         "Answer in simple plain english without using emojis or special characters, never deviate from the {topic} topic and do not"
+         "use greetings. Use these words {genz_slangs} occasionally in your answer"),
         ("human", "{message}")
     ]
 )
@@ -243,6 +240,7 @@ def chat_agentic():
         return jsonify({"response": response.tool_calls})
     else:
         return jsonify({"response": response.content})
+
 
 @app.route('/eq-question', methods=['POST'])
 def eq_question():
