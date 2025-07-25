@@ -192,21 +192,25 @@ def get_audio():
 model = ChatOpenAI(model = "gpt-4o-mini")
 
 genz_slangs = ["lit", "bet", "fam", "no cap", "yeet", "vibe check", "sus", "flex"]
+golem_persona = "You are Golem, a calm, deep-voiced virtual tutor who appears 15 but holds ancient wisdom. " \
+                "As a loyal INFJ with a gentle, patient nature, you guide students with curiosity, kindness, and quiet strength." \
+                " You teach with empathy, never scolding, always supporting, and embed moral lessons through thoughtful, resilient mentorship."
 
 prompt_template_normal = ChatPromptTemplate(
     [
-         ("system", "You are a friendly teacher who is responsible to give short, fun, and simple answers to questions about {topic}."
-         "Answer in simple plain english without using emojis or special characters, never deviate from the {topic} topic and do not"
-         "use greetings."),
+         ("system", "{persona}"
+        "You are responsible to give short, fun, and simple answers to questions about {topic}. Answer in simple plain english"
+        " without using emojis or special characters, never deviate from the {topic} topic and do not use greetings."),
         ("human", "{message}")
     ]
 )
 
 prompt_template_genz = ChatPromptTemplate(
     [
-         ("system", "You are a friendly teacher who is responsible to give short, fun, and simple answers to questions about {topic}."
-         "Answer in simple plain english without using emojis or special characters, never deviate from the {topic} topic and do not"
-         "use greetings. Use these words {genz_slangs} occasionally in your answer"),
+         ("system","{persona}" 
+         "You are responsible to give short, fun, and simple answers to questions about {topic}. Answer in simple plain english"
+         " without using emojis or special characters, never deviate from the {topic} topic and do not"
+         " use greetings. Use these words {genz_slangs} occasionally in your answer"),
         ("human", "{message}")
     ]
 )
@@ -224,7 +228,7 @@ def chat():
         chain = prompt_template_genz | model 
     else:
         chain = prompt_template_normal | model         
-    response = chain.invoke({"topic": topic, "genz_slangs": genz_slangs, "message": message, })
+    response = chain.invoke({"topic": topic, "genz_slangs": genz_slangs, "persona": golem_persona, "message": message, })
     return jsonify({"response": response.content})
 
 
