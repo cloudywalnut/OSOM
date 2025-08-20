@@ -5,8 +5,9 @@ from flask_cors import CORS
 from flask_socketio import SocketIO
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from pydantic import BaseModel, Field
+from supabase import create_client, Client
 import markdown
 
 import edge_tts
@@ -27,6 +28,11 @@ clientGoogle = OpenAI(
     api_key = os.getenv('apiKey-google'),
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
 )
+
+# Supabase setup
+url = os.getenv("SUPABASE_URL")
+key = os.getenv("SUPABASE_KEY")
+supabase: Client = create_client(url, key)
 
 
 @app.route('/')
@@ -378,6 +384,79 @@ def evaluate_responses():
     chain = prompt_template | model
     response = chain.invoke({"questions": questions, "answers": answers})
     return jsonify({"response": response.content})
+
+
+# QNA with context management in database - Supabase
+
+# Save a message to the DB
+def save_message(thread_id, role, content):
+    supabase.table("qna_context").insert({
+        "thread_id": thread_id,
+        "role": role,
+        "content": content
+    }).execute()
+
+# Get all messages for a thread - can later pass in a parameter to set a rate limiting
+def get_messages(thread_id):
+    response = supabase.table("qna_context") \
+        .select("role, content") \
+        .eq("thread_id", thread_id) \
+        .order("id", desc=False) \
+        .execute()
+    
+    return [(item['role'], item['content']) for item in response.data]
+
+# Convert DB messages to LangChain Message objects
+def build_message_objects(messages):
+    context_messages = []
+    golem_persona = "You are Golem, a calm, deep-voiced virtual tutor who appears 15 but holds ancient wisdom. " \
+                "As a loyal INFJ with a gentle, patient nature, you guide students with curiosity, kindness, and quiet strength." \
+                " You teach with empathy, never scolding, always supporting, and embed moral lessons through thoughtful, resilient mentorship."
+    context_messages.append(
+        SystemMessage(content="""
+            You are an interactive quiz assistant specialized in teaching users about the solar system. 
+            Start by asking the user 5 multiple-choice questions, one at a time. 
+            Give the user 3 chances per question to answer correctly. If they fail all 3 attempts, move to the next question. 
+            After all 5 questions are done, calculate and provide a final score out of 10, along with personalized feedback.
+
+            Important rules:
+            - Ignore irrelevant or off-topic messages. Gently redirect the user to answer the current question.
+            - Maintain context across all questions and answers.
+            - Only proceed to the next question after a valid final attempt.
+            - Do not give away the correct answer unless all 3 chances are used.
+        """)
+    )
+    for role, content in messages:
+        if role == "user":
+            context_messages.append(HumanMessage(content=content))
+        elif role == "ai":
+            context_messages.append(AIMessage(content=content))
+        # Add other role types if needed
+    return context_messages
+
+
+@app.route('/chat', methods = ["POST"])
+def chat():
+    data = request.json
+    thread_id = data.get("thread_id", "")
+    message = data.get("message", "")
+    if not thread_id:
+        return jsonify({"error": "No id provided"}), 400
+    else:
+        # save the message to the db
+        save_message(thread_id, "user", message)
+
+        # Get full history and build LangChain messages
+        history = get_messages(thread_id)
+        message_objs = build_message_objects(history)
+
+        # Get model response
+        response = model.invoke(message_objs)
+
+        # Save AI response
+        save_message(thread_id, "ai", response.content)
+
+        return jsonify({"response": response.content})
 
 
 # Was Facing some issues in deployment after using langchain as some versions were conflicting, hence i deleted the whole langchain
