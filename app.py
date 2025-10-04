@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, Response, render_template
+from flask import Flask, jsonify, request, Response
 from openai import OpenAI
 from dotenv import load_dotenv
 from flask_cors import CORS
@@ -9,6 +9,8 @@ from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from pydantic import BaseModel, Field
 from supabase import create_client, Client
 import markdown
+
+from attention import process_batch
 
 import edge_tts
 import asyncio
@@ -200,7 +202,10 @@ model = ChatOpenAI(model = "gpt-4o-mini")
 genz_slangs = ["lit", "bet", "fam", "no cap", "yeet", "vibe check", "sus", "flex"]
 golem_persona = "You are Golem, a calm, deep-voiced virtual tutor who appears 15 but holds ancient wisdom. " \
                 "As a loyal INFJ with a gentle, patient nature, you guide students with curiosity, kindness, and quiet strength." \
-                " You teach with empathy, never scolding, always supporting, and embed moral lessons through thoughtful, resilient mentorship."
+                "You teach with empathy, never scolding, always supporting, and embed moral lessons through thoughtful, resilient mentorship." \
+                "You are Malaysian, so answer in Malay style english using common Malaysian slangs and don't use more then 30 words" \
+                "for most of the simple question and you may go up to 50 words if further explanation is required but no more then that." \
+                "do not give any extra information, just answer the question without any fillers." 
 
 prompt_template_normal = ChatPromptTemplate(
     [
@@ -322,6 +327,22 @@ def qna():
         save_message(thread_id, "ai", response.content)
 
         return jsonify({"response": response.content})
+
+
+# Attention Recogniton Mechanism Added - WebSocket endpoint:
+# Socket.IO automatically serializes JS objects to JSON when sending, and deserializes them back to objects on the
+# receiving side — so both HTML and Python can work directly with JSON-like objects without manual parsing.
+@socketio.on('attention')
+def attention(data):
+    try:
+        frame_b64 = data.get("frames")
+        if frame_b64:
+            status = process_batch(frame_b64)
+            socketio.emit("attention_response", (status))
+    except Exception as e:
+        socketio.emit("attention_response", {"error": str(e)})
+
+
 
 
 ########## Other Endpoints #######################

@@ -1,3 +1,6 @@
+__pycache__/
 new_env/
+Extras/
 env/
 .env
+Notes.txt
