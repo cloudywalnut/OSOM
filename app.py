@@ -277,7 +277,7 @@ def get_messages(thread_id):
     return [(item['role'], item['content']) for item in response.data]
 
 # Convert DB messages to LangChain Message objects
-def build_message_objects(messages):
+def build_message_objects(messages, initiate):
     context_messages = []
     golem_persona = "You are Golem, a calm, deep-voiced virtual tutor who appears 15 but holds ancient wisdom. " \
                 "As a loyal INFJ with a gentle, patient nature, you guide students with curiosity, kindness, and quiet strength." \
@@ -296,18 +296,20 @@ def build_message_objects(messages):
             - Do not give away the correct answer unless all 3 chances are used.
         """)
     )
-    for role, content in messages:
-        if role == "user":
-            context_messages.append(HumanMessage(content=content))
-        elif role == "ai":
-            context_messages.append(AIMessage(content=content))
-        # Add other role types if needed
+    if (not initiate):
+        for role, content in messages:
+            if role == "user":
+                context_messages.append(HumanMessage(content=content))
+            elif role == "ai":
+                context_messages.append(AIMessage(content=content))
+            # Add other role types if needed
     return context_messages
 
 
 @app.route('/qna', methods = ["POST"])
 def qna():
     data = request.json
+    initiate = data.get("initiate")
     thread_id = data.get("thread_id", "")
     message = data.get("message", "")
     if not thread_id:
@@ -318,7 +320,7 @@ def qna():
 
         # Get full history and build LangChain messages
         history = get_messages(thread_id)
-        message_objs = build_message_objects(history)
+        message_objs = build_message_objects(history, initiate)
 
         # Get model response
         response = model.invoke(message_objs)
