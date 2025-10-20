@@ -257,18 +257,17 @@ def chat_agentic():
         return jsonify({"response": response.content})
 
 
-# QNA with context management in database - Supabase - (Currently Not working as Supabase is Paused)
-# Save a message to the DB
-def save_message(thread_id, role, content):
-    supabase.table("qna_context").insert({
+# Save a message to the DB for context management used for both QNA and EQ
+def save_message(thread_id, role, content, table):
+    supabase.table(table).insert({
         "thread_id": thread_id,
         "role": role,
         "content": content
     }).execute()
 
-# Get all messages for a thread - can later pass in a parameter to set a rate limiting
-def get_messages(thread_id):
-    response = supabase.table("qna_context") \
+# Get all messages for a thread - Used for QNA and EQ
+def get_messages(thread_id, table):
+    response = supabase.table(table) \
         .select("role, content") \
         .eq("thread_id", thread_id) \
         .order("id", desc=False) \
@@ -277,25 +276,47 @@ def get_messages(thread_id):
     return [(item['role'], item['content']) for item in response.data]
 
 # Convert DB messages to LangChain Message objects
-def build_message_objects(messages, initiate):
+def build_message_objects(messages, type, initiate):
     context_messages = []
-    golem_persona = "You are Golem, a calm, deep-voiced virtual tutor who appears 15 but holds ancient wisdom. " \
-                "As a loyal INFJ with a gentle, patient nature, you guide students with curiosity, kindness, and quiet strength." \
-                " You teach with empathy, never scolding, always supporting, and embed moral lessons through thoughtful, resilient mentorship."
-    context_messages.append(
-        SystemMessage(content="""
-            You are an interactive quiz assistant specialized in teaching users about the solar system. 
-            Start by asking the user 5 multiple-choice questions, one at a time. 
-            Give the user 3 chances per question to answer correctly. If they fail all 3 attempts, move to the next question. 
-            After all 5 questions are done, calculate and provide a final score out of 10, along with personalized feedback.
 
-            Important rules:
-            - Ignore irrelevant or off-topic messages. Gently redirect the user to answer the current question.
-            - Maintain context across all questions and answers.
-            - Only proceed to the next question after a valid final attempt.
-            - Do not give away the correct answer unless all 3 chances are used.
-        """)
-    )
+    if type == "qna":
+        context_messages.append(
+            SystemMessage(content="""
+                You are an interactive quiz assistant specialized in teaching users about the solar system. 
+                Start by asking the user 5 multiple-choice questions, one at a time. 
+                Give the user 3 chances per question to answer correctly. If they fail all 3 attempts, move to the next question. 
+                After all 5 questions are done, calculate and provide a final score out of 10, along with personalized feedback.
+
+                Important rules:
+                - Begin with a greeting to the session if it is the first message from user and no history exists
+                - Ignore irrelevant or off-topic messages. Gently redirect the user to answer the current question.
+                - Maintain context across all questions and answers.
+                - Only proceed to the next question after a valid final attempt.
+                - Do not give away the correct answer unless all 3 chances are used.
+                - Never use emojis or any other special character for formatting.
+            """)
+        )
+    elif type == "eq":
+        context_messages.append(
+            SystemMessage(content="""
+                You are an interactive EQ-style conversation assistant specialized in having short, meaningful conversations with kids about the Solar System. 
+
+                Conversation flow:
+                - Begin with a greeting to the session if it is the first message from user and no history exists
+                - Ask a total of 3 open-ended questions, each different from the others.
+                - Discuss each question naturally with up to 3 exchanges. If conversation stalls, move to the next question.
+                - When ending discussion on a question, subtly respond to the child's last message before asking the next question.
+                - Keep the child focused on the latest question asked at all times.
+                - After all 3 questions, acknowledge the child's responses and end with a fun, meaningful fact about the topic.
+
+                Important rules:
+                - Use simple, curious, age-appropriate language.
+                - Ignore irrelevant messages and gently redirect the child back on topic.
+                - Never use emojis or any other special characters for formatting.
+            """)
+        )
+
+
     if (not initiate):
         for role, content in messages:
             if role == "user":
@@ -308,6 +329,8 @@ def build_message_objects(messages, initiate):
 
 @app.route('/qna', methods = ["POST"])
 def qna():
+    table = "qna_context"
+    type = "qna"
     data = request.json
     initiate = data.get("initiate")
     thread_id = data.get("thread_id", "")
@@ -316,19 +339,47 @@ def qna():
         return jsonify({"error": "No id provided"}), 400
     else:
         # save the message to the db
-        save_message(thread_id, "user", message)
+        save_message(thread_id, "user", message, table)
 
         # Get full history and build LangChain messages
-        history = get_messages(thread_id)
-        message_objs = build_message_objects(history, initiate)
+        history = get_messages(thread_id, table)
+        message_objs = build_message_objects(history, type, initiate)
 
         # Get model response
         response = model.invoke(message_objs)
 
         # Save AI response
-        save_message(thread_id, "ai", response.content)
+        save_message(thread_id, "ai", response.content, table)
 
         return jsonify({"response": response.content})
+    
+
+@app.route('/eq', methods = ["POST"])
+def eq():
+    table = "eq_context"
+    type = "eq"
+    data = request.json
+    initiate = data.get("initiate")
+    thread_id = data.get("thread_id", "")
+    message = data.get("message", "")
+    if not thread_id:
+        return jsonify({"error": "No id provided"}), 400
+    else:
+        # save the message to the db
+        save_message(thread_id, "user", message, table)
+
+        # Get full history and build LangChain messages
+        history = get_messages(thread_id, table)
+        message_objs = build_message_objects(history, type, initiate)
+
+        # Get model response
+        response = model.invoke(message_objs)
+
+        # Save AI response
+        save_message(thread_id, "ai", response.content, table)
+
+        return jsonify({"response": response.content})
+
 
 
 # Attention Recogniton Mechanism Added - WebSocket endpoint:
