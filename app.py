@@ -9,6 +9,8 @@ from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from pydantic import BaseModel, Field
 from supabase import create_client, Client
 import markdown
+import re
+import json
 
 from attention import process_batch
 
@@ -294,6 +296,11 @@ def build_message_objects(messages, type, initiate):
                 - Only proceed to the next question after a valid final attempt.
                 - Do not give away the correct answer unless all 3 chances are used.
                 - Never use emojis or any other special character for formatting.
+                - If it is the final response after all questions are completed, reply strictly in the following JSON format:
+                    {
+                        "response": <final message based on above instructions>,
+                        "session_end": true
+                    }
             """)
         )
     elif type == "eq":
@@ -304,6 +311,7 @@ def build_message_objects(messages, type, initiate):
                 Conversation flow:
                 - Begin with a greeting to the session if it is the first message from user and no history exists
                 - Ask a total of 3 open-ended questions, each different from the others.
+                - Each question should be thought-provoking and imaginative, encouraging the child to think about emotions, choices, or creative possibilities related to space.
                 - Discuss each question naturally with up to 3 exchanges. If conversation stalls, move to the next question.
                 - When ending discussion on a question, subtly respond to the child's last message before asking the next question.
                 - Keep the child focused on the latest question asked at all times.
@@ -311,8 +319,15 @@ def build_message_objects(messages, type, initiate):
 
                 Important rules:
                 - Use simple, curious, age-appropriate language.
+                - The questions should be imaginative, reflective, and unique for examples: What would Earth say about how humans treat it,
+                  What would you do if the Sun vanished for a day, How would you comfort a lonely alien, How would you make people feel safe and happy on Mars.                       
                 - Ignore irrelevant messages and gently redirect the child back on topic.
                 - Never use emojis or any other special characters for formatting.
+                - If it is the final response after all questions are completed, reply strictly in the following JSON format:
+                    {
+                        "response": <final message based on above instructions>,
+                        "session_end": true
+                    }
             """)
         )
 
@@ -327,7 +342,14 @@ def build_message_objects(messages, type, initiate):
     return context_messages
 
 
-@app.route('/qna', methods = ["POST"])
+def clean_response(text):
+    # Remove any unwanted characters and normalize spaces
+    text = re.sub(r'[^a-zA-Z0-9:.,()\s]+', ' ', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
+@app.route('/qna', methods=["POST"])
 def qna():
     table = "qna_context"
     type = "qna"
@@ -335,26 +357,32 @@ def qna():
     initiate = data.get("initiate")
     thread_id = data.get("thread_id", "")
     message = data.get("message", "")
+
     if not thread_id:
         return jsonify({"error": "No id provided"}), 400
-    else:
-        # save the message to the db
-        save_message(thread_id, "user", message, table)
 
-        # Get full history and build LangChain messages
-        history = get_messages(thread_id, table)
-        message_objs = build_message_objects(history, type, initiate)
+    save_message(thread_id, "user", message, table)
+    history = get_messages(thread_id, table)
+    message_objs = build_message_objects(history, type, initiate)
+    response = model.invoke(message_objs)
+    content = response.content.strip()
 
-        # Get model response
-        response = model.invoke(message_objs)
+    # Try to extract a JSON block if it exists
+    json_match = re.search(r'\{[\s\S]*\}', content)
+    if json_match:
+        try:
+            json_part = json.loads(json_match.group(0))
+            return jsonify(json_part)
+        except json.JSONDecodeError:
+            pass  # Fall back to text output if invalid JSON
 
-        # Save AI response
-        save_message(thread_id, "ai", response.content, table)
+    # Otherwise, clean and return as plain text
+    clean_text = clean_response(content)
+    save_message(thread_id, "ai", clean_text, table)
+    return jsonify({"response": clean_text})
 
-        return jsonify({"response": response.content})
-    
 
-@app.route('/eq', methods = ["POST"])
+@app.route('/eq', methods=["POST"])
 def eq():
     table = "eq_context"
     type = "eq"
@@ -362,24 +390,28 @@ def eq():
     initiate = data.get("initiate")
     thread_id = data.get("thread_id", "")
     message = data.get("message", "")
+
     if not thread_id:
         return jsonify({"error": "No id provided"}), 400
-    else:
-        # save the message to the db
-        save_message(thread_id, "user", message, table)
 
-        # Get full history and build LangChain messages
-        history = get_messages(thread_id, table)
-        message_objs = build_message_objects(history, type, initiate)
+    save_message(thread_id, "user", message, table)
+    history = get_messages(thread_id, table)
+    message_objs = build_message_objects(history, type, initiate)
+    response = model.invoke(message_objs)
+    content = response.content.strip()
 
-        # Get model response
-        response = model.invoke(message_objs)
+    # Same cleanup logic
+    json_match = re.search(r'\{[\s\S]*\}', content)
+    if json_match:
+        try:
+            json_part = json.loads(json_match.group(0))
+            return jsonify(json_part)
+        except json.JSONDecodeError:
+            pass
 
-        # Save AI response
-        save_message(thread_id, "ai", response.content, table)
-
-        return jsonify({"response": response.content})
-
+    clean_text = clean_response(content)
+    save_message(thread_id, "ai", clean_text, table)
+    return jsonify({"response": clean_text})
 
 
 # Attention Recogniton Mechanism Added - WebSocket endpoint:
